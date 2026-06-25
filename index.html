@@ -14,7 +14,6 @@
       --line: #374151;
       --accent: #60a5fa;
       --danger: #ef4444;
-      --success: #22c55e;
     }
 
     * {
@@ -66,8 +65,8 @@
 
     .team-row {
       display: grid;
-      grid-template-columns: 1fr auto auto auto auto;
-      gap: 6px;
+      grid-template-columns: 26px 1fr auto auto auto auto;
+      gap: 8px;
       align-items: center;
       padding: 8px 6px;
       border-bottom: 1px solid rgba(55, 65, 81, 0.65);
@@ -77,10 +76,19 @@
       border-bottom: none;
     }
 
+    .flag {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      display: block;
+      background: #fff;
+    }
+
     .team-name {
       font-size: 14px;
       line-height: 1.2;
-      padding-right: 4px;
       word-break: break-word;
     }
 
@@ -116,7 +124,6 @@
       cursor: pointer;
       font-weight: 700;
       padding: 0 2px;
-      margin-left: 2px;
       white-space: nowrap;
     }
 
@@ -293,13 +300,22 @@
 
     const grid = document.getElementById("grid");
 
+    function flagSrc(countryName) {
+      return `flags/${encodeURIComponent(countryName)}.png`;
+    }
+
     function makeTeamRow(teamName, rank) {
       const row = document.createElement("div");
       row.className = "team-row";
 
+      const flag = document.createElement("img");
+      flag.className = "flag";
+      flag.src = flagSrc(teamName);
+      flag.alt = `${teamName} flag`;
+
       const name = document.createElement("div");
       name.className = "team-name";
-      name.innerHTML = `${teamName}${rank === "" ? "" : ` <span class="rank">(${rank})</span>`}`;
+      name.innerHTML = `${teamName} ${rank === "" ? "" : `<span class="rank">(${rank})</span>`}`;
 
       const wBtn = document.createElement("button");
       wBtn.className = "result-btn";
@@ -329,6 +345,7 @@
         name.classList.toggle("eliminated");
       });
 
+      row.appendChild(flag);
       row.appendChild(name);
       row.appendChild(wBtn);
       row.appendChild(dBtn);
