@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team Tracker</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --line: #374151;
+      --accent: #60a5fa;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #111827 100%);
+      color: var(--text);
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      text-align: center;
+      font-size: 28px;
+      letter-spacing: 0.5px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(220px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+
+    .column {
+      background: rgba(17, 24, 39, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .column-header {
+      background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+      padding: 14px 12px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .teams {
+      padding: 8px;
+    }
+
+    .team-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: 6px;
+      align-items: center;
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.65);
+    }
+
+    .team-row:last-child {
+      border-bottom: none;
+    }
+
+    .team-name {
+      font-size: 14px;
+      line-height: 1.2;
+      padding-right: 4px;
+      word-break: break-word;
+    }
+
+    .team-name.eliminated {
+      color: var(--danger);
+      text-decoration: line-through;
+      text-decoration-thickness: 2px;
+    }
+
+    .result-btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 8px;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 0;
+    }
+
+    .result-btn:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .elim-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--danger);
+      cursor: pointer;
+      font-weight: 700;
+      padding: 0 2px;
+      margin-left: 2px;
+      white-space: nowrap;
+    }
+
+    .elim-btn:hover {
+      text-decoration: underline;
+    }
+
+    .totals {
+      padding: 10px 12px 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(31, 41, 55, 0.55);
+    }
+
+    .totals-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #f3f4f6;
+    }
+
+    .totals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .total-box {
+      background: #0b1220;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .total-label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .total-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #111827;
+      color: var(--text);
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      padding: 6px 4px;
+      outline: none;
+    }
+
+    .total-input:focus {
+      border-color: var(--accent);
+    }
+
+    .rank {
+      color: var(--muted);
+    }
+
+    .legend {
+      margin: 0 auto 16px;
+      max-width: 1200px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1400px) {
+      .grid {
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
+      }
+    }
+
+    @media (max-width: 820px) {
+      .grid {
+        grid-template-columns: repeat(1, minmax(220px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>World Cup Team Tracker</h1>
+  <div class="legend">
+    Click <strong>W</strong>, <strong>D</strong>, or <strong>L</strong> to update totals. Click <strong>Elim.</strong> to toggle red strikethrough.
+  </div>
+
+  <div id="grid" class="grid"></div>
+
+  <script>
+    const columns = [
+      {
+        header: "Dad",
+        teams: [
+          ["Iran", 20],
+          ["Ecuador", 24],
+          ["Iraq", 57],
+          ["Cape Verde", 67],
+          ["Ivory Coast", 33],
+          ["Haiti", 83],
+          ["South Africa", 61],
+          ["Croatia", 11],
+        ],
+      },
+      {
+        header: "Mom",
+        teams: [
+          ["Uzbekistan", 50],
+          ["Algeria", 28],
+          ["Scotland", 40],
+          ["DR Congo", 46],
+          ["Japan", 18],
+          ["Uruguay", 17],
+          ["Paraguay", 42],
+          ["Turkey", 23],
+        ],
+      },
+      {
+        header: "Connor",
+        teams: [
+          ["Belgium", 9],
+          ["Jordan", 64],
+          ["Sweden", 38],
+          ["Netherlands", 8],
+          ["Curacao", 82],
+          ["Bosnia", 63],
+          ["Panama", 34],
+          ["Egypt", 29],
+        ],
+      },
+      {
+        header: "Kole",
+        teams: [
+          ["Canada", 31],
+          ["USA", 15],
+          ["Czechia", 43],
+          ["Morocco", 7],
+          ["England", 4],
+          ["Portugal", 5],
+          ["Argentina", 1],
+          ["Norway", 30],
+        ],
+      },
+      {
+        header: "Sahriya",
+        teams: [
+          ["Tunisia", 45],
+          ["Spain", 2],
+          ["South Korea", 22],
+          ["Brazil", 6],
+          ["Columbia", 14],
+          ["Australia", 27],
+          ["Germany", 10],
+          ["Qatar", 56],
+        ],
+      },
+      {
+        header: "Ian",
+        teams: [
+          ["Senegal", 16],
+          ["Austria", 25],
+          ["Ghana", 73],
+          ["New Zealand", 85],
+          ["Mexico", 13],
+          ["Saudi Arabia", 60],
+          ["France", 3],
+          ["Switzerland", 19],
+        ],
+      },
+    ];
+
+    const grid = document.getElementById("grid");
+
+    function makeTeamRow(teamName, rank) {
+      const row = document.createElement("div");
+      row.className = "team-row";
+
+      const name = document.createElement("div");
+      name.className = "team-name";
+      name.innerHTML = `${teamName}${rank === "" ? "" : ` <span class="rank">(${rank})</span>`}`;
+
+      const wBtn = document.createElement("button");
+      wBtn.className = "result-btn";
+      wBtn.textContent = "W";
+      wBtn.title = "Add win";
+
+      const dBtn = document.createElement("button");
+      dBtn.className = "result-btn";
+      dBtn.textContent = "D";
+      dBtn.title = "Add draw";
+
+      const lBtn = document.createElement("button");
+      lBtn.className = "result-btn";
+      lBtn.textContent = "L";
+      lBtn.title = "Add loss";
+
+      const elimBtn = document.createElement("button");
+      elimBtn.className = "elim-btn";
+      elimBtn.textContent = "Elim.";
+      elimBtn.title = "Toggle elimination";
+
+      wBtn.addEventListener("click", () => incrementCounter(row.closest(".column"), "wins"));
+      dBtn.addEventListener("click", () => incrementCounter(row.closest(".column"), "draws"));
+      lBtn.addEventListener("click", () => incrementCounter(row.closest(".column"), "losses"));
+
+      elimBtn.addEventListener("click", () => {
+        name.classList.toggle("eliminated");
+      });
+
+      row.appendChild(name);
+      row.appendChild(wBtn);
+      row.appendChild(dBtn);
+      row.appendChild(lBtn);
+      row.appendChild(elimBtn);
+
+      return row;
+    }
+
+    function makeColumn(columnData) {
+      const column = document.createElement("div");
+      column.className = "column";
+
+      const header = document.createElement("div");
+      header.className = "column-header";
+      header.textContent = columnData.header;
+
+      const teamsWrap = document.createElement("div");
+      teamsWrap.className = "teams";
+
+      columnData.teams.forEach(([teamName, rank]) => {
+        teamsWrap.appendChild(makeTeamRow(teamName, rank));
+      });
+
+      const totals = document.createElement("div");
+      totals.className = "totals";
+      totals.innerHTML = `
+        <div class="totals-title">Totals</div>
+        <div class="totals-grid">
+          <div class="total-box">
+            <span class="total-label">Wins</span>
+            <input class="total-input" type="number" min="0" value="0" data-total="wins" />
+          </div>
+          <div class="total-box">
+            <span class="total-label">Draws</span>
+            <input class="total-input" type="number" min="0" value="0" data-total="draws" />
+          </div>
+          <div class="total-box">
+            <span class="total-label">Losses</span>
+            <input class="total-input" type="number" min="0" value="0" data-total="losses" />
+          </div>
+        </div>
+      `;
+
+      column.appendChild(header);
+      column.appendChild(teamsWrap);
+      column.appendChild(totals);
+
+      return column;
+    }
+
+    function incrementCounter(column, type) {
+      const input = column.querySelector(`input[data-total="${type}"]`);
+      input.value = Number(input.value || 0) + 1;
+    }
+
+    columns.forEach(col => grid.appendChild(makeColumn(col)));
+  </script>
+</body>
+</html>
