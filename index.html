@@ -382,30 +382,41 @@
     const appState = {};
 
     function ensureStateForColumn(columnData) {
-      if (!storedState[columnData.header]) {
-        storedState[columnData.header] = defaultColumnState(columnData);
-      } else if (!storedState[columnData.header].teams) {
-        storedState[columnData.header] = defaultColumnState(columnData);
-      } else {
-        columnData.teams.forEach(([teamName]) => {
-          if (!storedState[columnData.header].teams[teamName]) {
-            storedState[columnData.header].teams[teamName] = defaultTeamState();
+      const currentTeamNames = new Set(columnData.teams.map(([teamName]) => teamName));
+      const existing = storedState[columnData.header];
+
+      const cleaned = defaultColumnState(columnData);
+
+      if (existing && existing.teams) {
+        for (const [teamName, teamState] of Object.entries(existing.teams)) {
+          if (currentTeamNames.has(teamName)) {
+            cleaned.teams[teamName] = {
+              w: Math.max(0, Number(teamState.w) || 0),
+              d: Math.max(0, Number(teamState.d) || 0),
+              l: Math.max(0, Number(teamState.l) || 0),
+              eliminated: Boolean(teamState.eliminated),
+            };
           }
-        });
+        }
       }
-      appState[columnData.header] = storedState[columnData.header];
-      return appState[columnData.header];
+
+      storedState[columnData.header] = cleaned;
+      appState[columnData.header] = cleaned;
+      return cleaned;
     }
 
-    function getColumnTotals(columnState) {
+    function getColumnTotals(columnData, columnState) {
       const totals = { wins: 0, draws: 0, losses: 0, remaining: 0, eliminated: 0 };
-      Object.values(columnState.teams).forEach(team => {
+
+      columnData.teams.forEach(([teamName]) => {
+        const team = columnState.teams[teamName] || defaultTeamState();
         totals.wins += Number(team.w || 0);
         totals.draws += Number(team.d || 0);
         totals.losses += Number(team.l || 0);
         if (team.eliminated) totals.eliminated += 1;
         else totals.remaining += 1;
       });
+
       return totals;
     }
 
@@ -428,8 +439,8 @@
       return btn;
     }
 
-    function updateColumnSummary(columnElement, columnState) {
-      const totals = getColumnTotals(columnState);
+    function updateColumnSummary(columnElement, columnData, columnState) {
+      const totals = getColumnTotals(columnData, columnState);
       columnElement.querySelector('[data-total="wins"]').textContent = totals.wins;
       columnElement.querySelector('[data-total="draws"]').textContent = totals.draws;
       columnElement.querySelector('[data-total="losses"]').textContent = totals.losses;
@@ -446,7 +457,7 @@
       teamNameEl.classList.toggle("eliminated", Boolean(teamState.eliminated));
     }
 
-    function makeTeamRow(teamName, rank, columnName, columnState, columnElement) {
+    function makeTeamRow(teamName, rank, columnData, columnState, columnElement) {
       const teamState = columnState.teams[teamName];
 
       const row = document.createElement("div");
@@ -467,13 +478,13 @@
           teamState.w += 1;
           saveAllState(storedState);
           refreshTeamRow(row, teamState);
-          updateColumnSummary(columnElement, columnState);
+          updateColumnSummary(columnElement, columnData, columnState);
         },
         () => {
           teamState.w = Math.max(0, teamState.w - 1);
           saveAllState(storedState);
           refreshTeamRow(row, teamState);
-          updateColumnSummary(columnElement, columnState);
+          updateColumnSummary(columnElement, columnData, columnState);
         }
       );
       wBtn.dataset.count = "w";
@@ -485,13 +496,13 @@
           teamState.d += 1;
           saveAllState(storedState);
           refreshTeamRow(row, teamState);
-          updateColumnSummary(columnElement, columnState);
+          updateColumnSummary(columnElement, columnData, columnState);
         },
         () => {
           teamState.d = Math.max(0, teamState.d - 1);
           saveAllState(storedState);
           refreshTeamRow(row, teamState);
-          updateColumnSummary(columnElement, columnState);
+          updateColumnSummary(columnElement, columnData, columnState);
         }
       );
       dBtn.dataset.count = "d";
@@ -503,13 +514,13 @@
           teamState.l += 1;
           saveAllState(storedState);
           refreshTeamRow(row, teamState);
-          updateColumnSummary(columnElement, columnState);
+          updateColumnSummary(columnElement, columnData, columnState);
         },
         () => {
           teamState.l = Math.max(0, teamState.l - 1);
           saveAllState(storedState);
           refreshTeamRow(row, teamState);
-          updateColumnSummary(columnElement, columnState);
+          updateColumnSummary(columnElement, columnData, columnState);
         }
       );
       lBtn.dataset.count = "l";
@@ -525,7 +536,7 @@
         teamState.eliminated = !teamState.eliminated;
         saveAllState(storedState);
         refreshTeamRow(row, teamState);
-        updateColumnSummary(columnElement, columnState);
+        updateColumnSummary(columnElement, columnData, columnState);
       });
 
       row.appendChild(flag);
@@ -564,10 +575,10 @@
       teamsWrap.appendChild(wdlHeader);
 
       columnData.teams.forEach(([teamName, rank]) => {
-        teamsWrap.appendChild(makeTeamRow(teamName, rank, columnData.header, columnState, column));
+        teamsWrap.appendChild(makeTeamRow(teamName, rank, columnData, columnState, column));
       });
 
-      const totals = getColumnTotals(columnState);
+      const totals = getColumnTotals(columnData, columnState);
 
       const totalsWrap = document.createElement("div");
       totalsWrap.className = "totals";
@@ -603,6 +614,7 @@
       column.appendChild(teamsWrap);
       column.appendChild(totalsWrap);
 
+      updateColumnSummary(column, columnData, columnState);
       return column;
     }
 
