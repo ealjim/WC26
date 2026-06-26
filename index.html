@@ -14,6 +14,7 @@
       --line: #374151;
       --accent: #60a5fa;
       --danger: #ef4444;
+      --success: #22c55e;
     }
 
     * {
@@ -29,17 +30,27 @@
     }
 
     h1 {
-      margin: 0 0 18px;
+      margin: 0 0 10px;
       text-align: center;
       font-size: 28px;
       letter-spacing: 0.5px;
     }
 
+    .legend {
+      margin: 0 auto 16px;
+      max-width: 1200px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(220px, 1fr));
+      grid-template-columns: repeat(6, minmax(260px, 1fr));
       gap: 14px;
       align-items: start;
+      overflow-x: auto;
+      padding-bottom: 8px;
     }
 
     .column {
@@ -48,6 +59,7 @@
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      min-width: 260px;
     }
 
     .column-header {
@@ -63,11 +75,32 @@
       padding: 8px;
     }
 
+    .wdl-header,
     .team-row {
       display: grid;
-      grid-template-columns: 26px 1fr auto auto auto auto;
+      grid-template-columns: 26px minmax(0, 1fr) 36px 36px 36px 54px;
       gap: 8px;
       align-items: center;
+    }
+
+    .wdl-header {
+      padding: 6px 6px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .wdl-header .spacer {
+      grid-column: 1 / span 2;
+    }
+
+    .wdl-header .label {
+      text-align: center;
+    }
+
+    .team-row {
       padding: 8px 6px;
       border-bottom: 1px solid rgba(55, 65, 81, 0.65);
     }
@@ -89,7 +122,10 @@
     .team-name {
       font-size: 14px;
       line-height: 1.2;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
 
     .team-name.eliminated {
@@ -98,20 +134,22 @@
       text-decoration-thickness: 2px;
     }
 
-    .result-btn {
+    .count-btn {
       appearance: none;
       border: 1px solid var(--line);
       background: var(--panel-2);
       color: var(--text);
       border-radius: 8px;
-      width: 30px;
-      height: 30px;
+      width: 36px;
+      height: 32px;
       cursor: pointer;
       font-weight: 700;
       padding: 0;
+      font-size: 14px;
+      user-select: none;
     }
 
-    .result-btn:hover {
+    .count-btn:hover {
       border-color: var(--accent);
       color: #fff;
     }
@@ -125,6 +163,7 @@
       font-weight: 700;
       padding: 0 2px;
       white-space: nowrap;
+      justify-self: start;
     }
 
     .elim-btn:hover {
@@ -166,7 +205,8 @@
       text-transform: uppercase;
     }
 
-    .total-input {
+    .total-value {
+      display: block;
       width: 100%;
       border: 1px solid var(--line);
       background: #111827;
@@ -176,34 +216,19 @@
       font-weight: 700;
       text-align: center;
       padding: 6px 4px;
-      outline: none;
-    }
-
-    .total-input:focus {
-      border-color: var(--accent);
-    }
-
-    .rank {
-      color: var(--muted);
-    }
-
-    .legend {
-      margin: 0 auto 16px;
-      max-width: 1200px;
-      color: var(--muted);
-      text-align: center;
-      font-size: 13px;
+      min-height: 38px;
+      line-height: 24px;
     }
 
     @media (max-width: 1400px) {
       .grid {
-        grid-template-columns: repeat(3, minmax(220px, 1fr));
+        grid-template-columns: repeat(3, minmax(260px, 1fr));
       }
     }
 
     @media (max-width: 820px) {
       .grid {
-        grid-template-columns: repeat(1, minmax(220px, 1fr));
+        grid-template-columns: repeat(1, minmax(260px, 1fr));
       }
     }
   </style>
@@ -211,12 +236,14 @@
 <body>
   <h1>World Cup Team Tracker</h1>
   <div class="legend">
-    Click <strong>W</strong>, <strong>D</strong>, or <strong>L</strong> to update totals. Click <strong>Elim.</strong> to toggle red strikethrough.
+    Left-click a W, D, or L number to increase it. Right-click a number to decrease it. Click <strong>Elim.</strong> to toggle red strikethrough.
   </div>
 
   <div id="grid" class="grid"></div>
 
   <script>
+    const STORAGE_KEY = "worldCupTeamTracker_v3";
+
     const columns = [
       {
         header: "Dad",
@@ -304,7 +331,99 @@
       return `flags/${encodeURIComponent(countryName)}.png`;
     }
 
-    function makeTeamRow(teamName, rank) {
+    function defaultTeamState() {
+      return { w: 0, d: 0, l: 0, eliminated: false };
+    }
+
+    function defaultColumnState(columnData) {
+      const teams = {};
+      columnData.teams.forEach(([teamName]) => {
+        teams[teamName] = defaultTeamState();
+      });
+      return { teams };
+    }
+
+    function loadAllState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    function saveAllState(state) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    const storedState = loadAllState() || {};
+    const appState = {};
+
+    function ensureStateForColumn(columnData) {
+      if (!storedState[columnData.header]) {
+        storedState[columnData.header] = defaultColumnState(columnData);
+      } else if (!storedState[columnData.header].teams) {
+        storedState[columnData.header] = defaultColumnState(columnData);
+      } else {
+        columnData.teams.forEach(([teamName]) => {
+          if (!storedState[columnData.header].teams[teamName]) {
+            storedState[columnData.header].teams[teamName] = defaultTeamState();
+          }
+        });
+      }
+      appState[columnData.header] = storedState[columnData.header];
+      return appState[columnData.header];
+    }
+
+    function getColumnTotals(columnState) {
+      const totals = { wins: 0, draws: 0, losses: 0 };
+      Object.values(columnState.teams).forEach(team => {
+        totals.wins += Number(team.w || 0);
+        totals.draws += Number(team.d || 0);
+        totals.losses += Number(team.l || 0);
+      });
+      return totals;
+    }
+
+    function makeCountButton(text, onLeftClick, onRightClick) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "count-btn";
+      btn.textContent = text;
+
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        onLeftClick();
+      });
+
+      btn.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        onRightClick();
+      });
+
+      return btn;
+    }
+
+    function updateTotalDisplay(columnElement, columnState) {
+      const totals = getColumnTotals(columnState);
+      columnElement.querySelector('[data-total="wins"]').textContent = totals.wins;
+      columnElement.querySelector('[data-total="draws"]').textContent = totals.draws;
+      columnElement.querySelector('[data-total="losses"]').textContent = totals.losses;
+    }
+
+    function refreshTeamRow(row, teamState) {
+      row.querySelector('[data-count="w"]').textContent = teamState.w;
+      row.querySelector('[data-count="d"]').textContent = teamState.d;
+      row.querySelector('[data-count="l"]').textContent = teamState.l;
+
+      const teamNameEl = row.querySelector(".team-name");
+      teamNameEl.classList.toggle("eliminated", Boolean(teamState.eliminated));
+    }
+
+    function makeTeamRow(teamName, rank, columnName, columnState, columnElement) {
+      const teamState = columnState.teams[teamName];
+
       const row = document.createElement("div");
       row.className = "team-row";
 
@@ -317,32 +436,70 @@
       name.className = "team-name";
       name.innerHTML = `${teamName} ${rank === "" ? "" : `<span class="rank">(${rank})</span>`}`;
 
-      const wBtn = document.createElement("button");
-      wBtn.className = "result-btn";
-      wBtn.textContent = "W";
-      wBtn.title = "Add win";
+      const wBtn = makeCountButton(
+        String(teamState.w),
+        () => {
+          teamState.w += 1;
+          saveAllState(storedState);
+          refreshTeamRow(row, teamState);
+          updateTotalDisplay(columnElement, columnState);
+        },
+        () => {
+          teamState.w = Math.max(0, teamState.w - 1);
+          saveAllState(storedState);
+          refreshTeamRow(row, teamState);
+          updateTotalDisplay(columnElement, columnState);
+        }
+      );
+      wBtn.dataset.count = "w";
+      wBtn.title = "Left-click to add W, right-click to subtract";
 
-      const dBtn = document.createElement("button");
-      dBtn.className = "result-btn";
-      dBtn.textContent = "D";
-      dBtn.title = "Add draw";
+      const dBtn = makeCountButton(
+        String(teamState.d),
+        () => {
+          teamState.d += 1;
+          saveAllState(storedState);
+          refreshTeamRow(row, teamState);
+          updateTotalDisplay(columnElement, columnState);
+        },
+        () => {
+          teamState.d = Math.max(0, teamState.d - 1);
+          saveAllState(storedState);
+          refreshTeamRow(row, teamState);
+          updateTotalDisplay(columnElement, columnState);
+        }
+      );
+      dBtn.dataset.count = "d";
+      dBtn.title = "Left-click to add D, right-click to subtract";
 
-      const lBtn = document.createElement("button");
-      lBtn.className = "result-btn";
-      lBtn.textContent = "L";
-      lBtn.title = "Add loss";
+      const lBtn = makeCountButton(
+        String(teamState.l),
+        () => {
+          teamState.l += 1;
+          saveAllState(storedState);
+          refreshTeamRow(row, teamState);
+          updateTotalDisplay(columnElement, columnState);
+        },
+        () => {
+          teamState.l = Math.max(0, teamState.l - 1);
+          saveAllState(storedState);
+          refreshTeamRow(row, teamState);
+          updateTotalDisplay(columnElement, columnState);
+        }
+      );
+      lBtn.dataset.count = "l";
+      lBtn.title = "Left-click to add L, right-click to subtract";
 
       const elimBtn = document.createElement("button");
+      elimBtn.type = "button";
       elimBtn.className = "elim-btn";
       elimBtn.textContent = "Elim.";
       elimBtn.title = "Toggle elimination";
 
-      wBtn.addEventListener("click", () => incrementCounter(row.closest(".column"), "wins"));
-      dBtn.addEventListener("click", () => incrementCounter(row.closest(".column"), "draws"));
-      lBtn.addEventListener("click", () => incrementCounter(row.closest(".column"), "losses"));
-
       elimBtn.addEventListener("click", () => {
-        name.classList.toggle("eliminated");
+        teamState.eliminated = !teamState.eliminated;
+        saveAllState(storedState);
+        refreshTeamRow(row, teamState);
       });
 
       row.appendChild(flag);
@@ -352,10 +509,13 @@
       row.appendChild(lBtn);
       row.appendChild(elimBtn);
 
+      refreshTeamRow(row, teamState);
       return row;
     }
 
     function makeColumn(columnData) {
+      const columnState = ensureStateForColumn(columnData);
+
       const column = document.createElement("div");
       column.className = "column";
 
@@ -366,43 +526,53 @@
       const teamsWrap = document.createElement("div");
       teamsWrap.className = "teams";
 
+      const wdlHeader = document.createElement("div");
+      wdlHeader.className = "wdl-header";
+      wdlHeader.innerHTML = `
+        <div class="spacer"></div>
+        <div class="label">W</div>
+        <div class="label">D</div>
+        <div class="label">L</div>
+        <div></div>
+      `;
+      teamsWrap.appendChild(wdlHeader);
+
       columnData.teams.forEach(([teamName, rank]) => {
-        teamsWrap.appendChild(makeTeamRow(teamName, rank));
+        teamsWrap.appendChild(makeTeamRow(teamName, rank, columnData.header, columnState, column));
       });
 
-      const totals = document.createElement("div");
-      totals.className = "totals";
-      totals.innerHTML = `
+      const totals = getColumnTotals(columnState);
+
+      const totalsWrap = document.createElement("div");
+      totalsWrap.className = "totals";
+      totalsWrap.innerHTML = `
         <div class="totals-title">Totals</div>
         <div class="totals-grid">
           <div class="total-box">
             <span class="total-label">Wins</span>
-            <input class="total-input" type="number" min="0" value="0" data-total="wins" />
+            <span class="total-value" data-total="wins">${totals.wins}</span>
           </div>
           <div class="total-box">
             <span class="total-label">Draws</span>
-            <input class="total-input" type="number" min="0" value="0" data-total="draws" />
+            <span class="total-value" data-total="draws">${totals.draws}</span>
           </div>
           <div class="total-box">
             <span class="total-label">Losses</span>
-            <input class="total-input" type="number" min="0" value="0" data-total="losses" />
+            <span class="total-value" data-total="losses">${totals.losses}</span>
           </div>
         </div>
       `;
 
       column.appendChild(header);
       column.appendChild(teamsWrap);
-      column.appendChild(totals);
+      column.appendChild(totalsWrap);
 
       return column;
     }
 
-    function incrementCounter(column, type) {
-      const input = column.querySelector(`input[data-total="${type}"]`);
-      input.value = Number(input.value || 0) + 1;
-    }
-
     columns.forEach(col => grid.appendChild(makeColumn(col)));
+
+    saveAllState(storedState);
   </script>
 </body>
 </html>
